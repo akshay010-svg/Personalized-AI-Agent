@@ -13,7 +13,7 @@ export default function Navbar({ onOpenConnectModal }: NavbarProps) {
 
   const navLinks = [
     { label: "Features", href: "/#features" },
-    { label: "Integrations", href: "/#integrations" },
+    { label: "Integrations", href: "/integrations" },
     { label: "Demo", href: "/#demo" },
     { label: "How It Works", href: "/#how-it-works" },
     { label: "Pricing", href: "/#pricing" },

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import {
   Mail,
   MessageSquare,
@@ -8,6 +9,7 @@ import {
   Check,
   ArrowRight,
   Shield,
+  Cpu,
 } from "lucide-react";
 
 interface ConnectedPlatformsProps {
@@ -123,10 +125,21 @@ export default function ConnectedPlatforms({ onOpenConnectModal }: ConnectedPlat
           })}
         </div>
 
-        {/* Minimal Security Callout */}
-        <div className="mt-8 flex items-center justify-center gap-2 text-xs text-slate-400 text-center">
-          <Shield className="h-3.5 w-3.5 text-emerald-400" />
-          <span>Stateless tokens & encrypted OAuth scopes. Passwords are never stored.</span>
+        {/* Minimal Security Callout & Link */}
+        <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-4 text-xs text-slate-400 text-center">
+          <div className="flex items-center gap-2">
+            <Shield className="h-3.5 w-3.5 text-emerald-400" />
+            <span>Stateless tokens & encrypted OAuth scopes. Passwords are never stored.</span>
+          </div>
+          <span className="hidden sm:inline text-white/20">•</span>
+          <Link
+            href="/integrations"
+            className="inline-flex items-center gap-1.5 font-semibold text-indigo-400 hover:text-indigo-300 transition-colors"
+          >
+            <Cpu className="h-3.5 w-3.5" />
+            <span>Browse All 11+ MCP Integrations</span>
+            <ArrowRight className="h-3 w-3" />
+          </Link>
         </div>
       </div>
     </section>
