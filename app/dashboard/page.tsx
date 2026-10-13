@@ -34,12 +34,39 @@ import {
 import { useAuth } from "@/context/AuthContext";
 import IntegrationsView from "@/components/IntegrationsView";
 
+function getStorageKey(userId: string) {
+  return `omnisync_connected_platforms__${userId}`;
+}
+
 export default function DashboardPage() {
   const router = useRouter();
   const { user, loading, signOut } = useAuth();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [activeNav, setActiveNav] = useState("dashboard");
+
+  // Per-user integration state (mirrors IntegrationsView localStorage)
+  const [connectedIds, setConnectedIds] = useState<string[]>([]);
+  const [connectedDetails, setConnectedDetails] = useState<Record<string, any>>({});
+
+  // Load integration state from per-user localStorage
+  useEffect(() => {
+    if (!user?.id) return;
+    const key = getStorageKey(user.id);
+    try {
+      const saved = localStorage.getItem(key);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        setConnectedIds(parsed.ids || []);
+        setConnectedDetails(parsed.details || {});
+      } else {
+        setConnectedIds([]);
+        setConnectedDetails({});
+      }
+    } catch {
+      setConnectedIds([]);
+    }
+  }, [user?.id, activeNav]); // re-read when switching back to dashboard tab
 
   // Redirect unauthenticated users to sign-in
   useEffect(() => {
@@ -477,7 +504,7 @@ export default function DashboardPage() {
             {[
               {
                 label: "Channels Connected",
-                value: "0",
+                value: String(connectedIds.length),
                 icon: Zap,
                 bgColor: "bg-indigo-600",
                 shadow: "shadow-indigo-600/25",
@@ -579,37 +606,71 @@ export default function DashboardPage() {
                       bgColor: "bg-blue-600",
                       shadow: "shadow-blue-600/20",
                     },
-                  ].map((channel) => (
-                    <div
-                      key={channel.id}
-                      className="flex items-center justify-between rounded-xl border border-white/8 bg-white/[0.02] p-3.5 hover:border-white/15 hover:bg-white/[0.04] transition-all group"
-                    >
-                      <div className="flex items-center gap-3.5">
-                        {/* Large icon with solid colored background */}
-                        <div
-                          className={`flex h-11 w-11 items-center justify-center rounded-xl ${channel.bgColor} text-white shadow-md ${channel.shadow} group-hover:scale-105 transition-transform`}
-                        >
-                          <channel.icon className="h-5 w-5" />
-                        </div>
-                        <div>
-                          <div className="text-sm font-semibold text-white">
-                            {channel.name}
-                          </div>
-                          <div className="text-xs text-slate-400">
-                            {channel.desc}
-                          </div>
-                        </div>
-                      </div>
-                      <button
-                        id={`connect-${channel.id}-btn`}
-                        onClick={() => setActiveNav("integrations")}
-                        className="inline-flex items-center gap-1.5 rounded-xl border border-indigo-500/30 bg-indigo-500/10 px-3.5 py-2 text-xs font-semibold text-indigo-300 hover:bg-indigo-500/20 hover:border-indigo-500/50 transition-all"
+                  ].map((channel) => {
+                    const isConnected = connectedIds.includes(channel.id);
+                    const details = connectedDetails[channel.id];
+                    return (
+                      <div
+                        key={channel.id}
+                        className={`flex items-center justify-between rounded-xl border p-3.5 transition-all group ${
+                          isConnected
+                            ? "border-emerald-500/30 bg-emerald-500/5 hover:border-emerald-500/50"
+                            : "border-white/8 bg-white/[0.02] hover:border-white/15 hover:bg-white/[0.04]"
+                        }`}
                       >
-                        Connect
-                        <ArrowRight className="h-3.5 w-3.5 group-hover:translate-x-0.5 transition-transform" />
-                      </button>
-                    </div>
-                  ))}
+                        <div className="flex items-center gap-3.5">
+                          {/* Large icon with solid colored background */}
+                          <div
+                            className={`relative flex h-11 w-11 items-center justify-center rounded-xl ${channel.bgColor} text-white shadow-md ${channel.shadow} group-hover:scale-105 transition-transform`}
+                          >
+                            <channel.icon className="h-5 w-5" />
+                            {isConnected && (
+                              <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-emerald-500 shadow-sm shadow-emerald-500/40">
+                                <CheckCircle2 className="h-2.5 w-2.5 text-white" />
+                              </span>
+                            )}
+                          </div>
+                          <div>
+                            <div className="text-sm font-semibold text-white flex items-center gap-2">
+                              {channel.name}
+                              {isConnected && (
+                                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 border border-emerald-500/25 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-300">
+                                  <span className="h-1 w-1 rounded-full bg-emerald-400 animate-pulse" />
+                                  Connected
+                                </span>
+                              )}
+                            </div>
+                            <div className="text-xs text-slate-400">
+                              {isConnected && details?.email
+                                ? details.email
+                                : channel.desc}
+                            </div>
+                          </div>
+                        </div>
+                        <button
+                          id={`connect-${channel.id}-btn`}
+                          onClick={() => setActiveNav("integrations")}
+                          className={`inline-flex items-center gap-1.5 rounded-xl border px-3.5 py-2 text-xs font-semibold transition-all ${
+                            isConnected
+                              ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20"
+                              : "border-indigo-500/30 bg-indigo-500/10 text-indigo-300 hover:bg-indigo-500/20 hover:border-indigo-500/50"
+                          }`}
+                        >
+                          {isConnected ? (
+                            <>
+                              <Settings className="h-3.5 w-3.5" />
+                              Settings
+                            </>
+                          ) : (
+                            <>
+                              Connect
+                              <ArrowRight className="h-3.5 w-3.5 group-hover:translate-x-0.5 transition-transform" />
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             </div>

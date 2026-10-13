@@ -21,18 +21,24 @@ import {
 import { PLATFORMS_DATA, PlatformIntegration } from "@/lib/integrations-data";
 import PlatformSettingsModal from "@/components/PlatformSettingsModal";
 import PlatformConnectModal from "@/components/PlatformConnectModal";
+import { useAuth } from "@/context/AuthContext";
 
 interface IntegrationsViewProps {
   initialConnectedIds?: string[];
   onConnectionChange?: (connectedIds: string[]) => void;
 }
 
-const STORAGE_KEY = "omnisync_connected_platforms";
+// Storage key is scoped per user to prevent data leaks across accounts
+function getStorageKey(userId: string) {
+  return `omnisync_connected_platforms__${userId}`;
+}
 
 export default function IntegrationsView({
   initialConnectedIds,
   onConnectionChange
 }: IntegrationsViewProps) {
+  const { user } = useAuth();
+
   // State for connected platform IDs
   const [connectedIds, setConnectedIds] = useState<string[]>([]);
   const [connectedDetails, setConnectedDetails] = useState<Record<string, any>>({});
@@ -48,8 +54,17 @@ export default function IntegrationsView({
   // Notification / toast feedback
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  // Initialize from localStorage or OAuth callback query params
+  // Reset connection state when user changes (prevents cross-user data leak)
   useEffect(() => {
+    setConnectedIds([]);
+    setConnectedDetails({});
+  }, [user?.id]);
+
+  // Initialize from localStorage (scoped by userId) or OAuth callback query params
+  useEffect(() => {
+    if (!user?.id) return; // Don't load until we know who is logged in
+    const STORAGE_KEY = getStorageKey(user.id);
+
     // Check if returning from Google OAuth callback redirect
     if (typeof window !== "undefined") {
       const url = new URL(window.location.href);
@@ -74,7 +89,7 @@ export default function IntegrationsView({
             connectedAt: new Date().toISOString()
           }
         };
-        saveState(updatedIds, updatedDetails);
+        saveState(updatedIds, updatedDetails, STORAGE_KEY);
         setToastMessage(`Successfully connected real Gmail account: ${realEmail}!`);
 
         url.searchParams.delete("connected");
@@ -98,17 +113,17 @@ export default function IntegrationsView({
     } catch {
       setConnectedIds(initialConnectedIds || []);
     }
-  }, [initialConnectedIds]);
+  }, [user?.id, initialConnectedIds]);
 
-  // Save to localStorage whenever connectedIds or connectedDetails change
-  const saveState = (newIds: string[], newDetails: Record<string, any>) => {
+  // Save to localStorage (scoped by userId) whenever connectedIds or connectedDetails change
+  const saveState = (newIds: string[], newDetails: Record<string, any>, storageKey?: string) => {
     setConnectedIds(newIds);
     setConnectedDetails(newDetails);
     try {
-      localStorage.setItem(
-        STORAGE_KEY,
-        JSON.stringify({ ids: newIds, details: newDetails })
-      );
+      const key = storageKey || (user?.id ? getStorageKey(user.id) : null);
+      if (key) {
+        localStorage.setItem(key, JSON.stringify({ ids: newIds, details: newDetails }));
+      }
     } catch (e) {
       console.warn("Could not save to localStorage", e);
     }
@@ -157,7 +172,8 @@ export default function IntegrationsView({
         await fetch("/api/mcp/gmail", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ action: "disconnect" })
+          // Pass userId so server-side token store removes the correct user's token
+          body: JSON.stringify({ action: "disconnect", userId: user?.id || user?.email })
         });
       } catch (err) {
         console.error("Disconnect error:", err);
